@@ -1,0 +1,149 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id             String          @id @default(cuid())
+  email          String          @unique
+  name           String
+  image          String?
+  emailVerified  DateTime?
+  accounts       Account[]
+  sessions       Session[]
+  subjectRatings SubjectRating[]
+  topicScores    TopicScore[]
+  quizSessions   QuizSession[]
+  createdAt      DateTime        @default(now())
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+  user              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+// One row per user per subject — the official rating
+model SubjectRating {
+  id         String   @id @default(cuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id])
+  subject    String   // 'os' | 'dbms' | 'oop' | 'cn' | 'sysdesign'
+  rating     Int      @default(800)
+  peakRating Int      @default(800)
+  theta      Float    @default(0)
+  attempts   Int      @default(0)
+  updatedAt  DateTime @updatedAt
+
+  @@unique([userId, subject])
+}
+
+// Topic-level scores for graph unlock logic
+model TopicScore {
+  id      String @id @default(cuid())
+  userId  String
+  user    User   @relation(fields: [userId], references: [id])
+  topicId String // e.g. 'os-sync'
+  subject String
+  score   Int    @default(50) // >= 50 unlocks children
+
+  @@unique([userId, topicId])
+}
+
+model Question {
+  id           String     @id @default(cuid())
+  topicId      String     // e.g. 'os-sync'
+  subject      String     // e.g. 'os'
+  tag          String     // e.g. 'os-sync-mutex' (for Trie)
+  text         String
+  options      Json       // string[4]
+  answer       Int        // 0-3 index
+  explanation  String
+  beta         Float      // IRT difficulty -3 to +3
+  timesShown   Int        @default(0)
+  timesCorrect Int        @default(0)
+  responses    Response[]
+
+  @@unique([tag])
+}
+
+model QuizSession {
+  id          String     @id @default(cuid())
+  userId      String
+  user        User       @relation(fields: [userId], references: [id])
+  subject     String
+  startTheta  Float
+  finalTheta  Float      @default(0)
+  startRating Int
+  finalRating Int        @default(0)
+  ratingDelta Int        @default(0)
+  totalQ      Int        @default(15)
+  correct     Int        @default(0)
+  completed   Boolean    @default(false)
+  startedAt   DateTime   @default(now())
+  completedAt DateTime?
+  responses   Response[]
+}
+
+model Response {
+  id          String      @id @default(cuid())
+  sessionId   String
+  session     QuizSession @relation(fields: [sessionId], references: [id])
+  questionId  String
+  question    Question    @relation(fields: [questionId], references: [id])
+  topicId     String
+  selectedOpt Int
+  isCorrect   Boolean
+  timeTaken   Float
+  thetaBefore Float
+  thetaAfter  Float
+  createdAt   DateTime    @default(now())
+}
+
+// Denormalized for fast leaderboard reads
+model LeaderboardEntry {
+  id         String   @id @default(cuid())
+  userId     String
+  userName   String
+  userImage  String?
+  subject    String
+  rating     Int      @default(800)
+  peakRating Int      @default(800)
+  attempts   Int
+  updatedAt  DateTime @updatedAt
+
+  @@unique([userId, subject])
+  @@index([subject, rating(sort: Desc)])
+}
