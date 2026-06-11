@@ -1,0 +1,5 @@
+const { PrismaClient } = require('@prisma/client')
+const db = new PrismaClient()
+db.question.updateMany({ where: { subject: 'oops' }, data: { subject: 'oop' } })
+  .then(r => { console.log('Updated:', r.count, 'questions from oops → oop'); return db.$disconnect() })
+  .catch(e => { console.error('Error:', e.message); return db.$disconnect() })

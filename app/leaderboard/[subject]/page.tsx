@@ -17,7 +17,7 @@ export default async function LeaderboardPage({
   const { subject } = await params
   if (!SUBJECT_LIST.includes(subject as typeof SUBJECT_LIST[number])) notFound()
 
-  const session = await auth()
+  const session = await auth().catch(() => null)
 
   const top10 = await db.leaderboardEntry.findMany({
     where: { subject },

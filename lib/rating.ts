@@ -45,13 +45,11 @@ export function calculateRatingChange(
   finalTheta: number,
   startTheta: number,
 ): number {
-  const expected = expectedTheta(currentRating)
-  const thetaVsExpected = finalTheta - expected
-  const k = kFactor(currentRating)
-  const normalizedPerf = Math.tanh(thetaVsExpected)
-  const rawDelta = Math.round(k * normalizedPerf)
-  const newRating = Math.max(800, currentRating + rawDelta)
-  return newRating - currentRating
+  // NOTE: startTheta is unused here — we compute performance from the quiz
+  // session's responses in computeRatingUpdate instead (see below).
+  void startTheta
+  void finalTheta
+  return 0 // placeholder; see computeRatingUpdate for the real logic
 }
 
 export interface RatingUpdate {
@@ -67,14 +65,41 @@ export interface RatingUpdate {
   newPeak: boolean
 }
 
+export interface SessionQuestion {
+  beta: number
+  isCorrect: boolean
+}
+
 export function computeRatingUpdate(
   currentRating: number,
   currentPeakRating: number,
   finalTheta: number,
   startTheta: number,
+  questions: SessionQuestion[],
 ): RatingUpdate {
-  const delta = calculateRatingChange(currentRating, finalTheta, startTheta)
-  const newRating = currentRating + delta
+  // ── Performance score ───────────────────────────────────────────────────────
+  // Each question's difficulty (beta) is a proxy for "expected ability".
+  // Performing well on hard questions (high beta) = strong performance.
+  // Performing poorly on easy questions (low beta) = weak performance.
+  //
+  // We compute a "difficulty-weighted accuracy" score:
+  //   - Correct on hard questions (high beta) → large positive contribution
+  //   - Correct on easy questions (low beta)  → small positive contribution
+  //   - Wrong on easy questions  (low beta)  → small negative contribution
+  //   - Wrong on hard questions  (high beta)  → large negative contribution
+  //
+  // Then normalise to [-1, 1] via tanh so deltas are bounded and stable.
+  const totalBeta = questions.reduce((sum, q) => sum + q.beta, 0)
+  const score = questions.reduce((sum, q) => {
+    const weight = q.beta / (totalBeta || 1)
+    return sum + (q.isCorrect ? 1 : -1) * weight
+  }, 0)
+  const normalizedPerf = Math.tanh(score * 2) // ×2 sharpens discrimination
+
+  // ── K-factor (smaller for higher-rated players) ─────────────────────────────
+  const k = kFactor(currentRating)
+  const delta = Math.round(k * normalizedPerf)
+  const newRating = Math.max(800, currentRating + delta)
 
   const oldTier = getRatingTier(currentRating)
   const newTier = getRatingTier(newRating)

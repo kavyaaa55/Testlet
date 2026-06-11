@@ -27,7 +27,7 @@ export default async function SubjectDetailPage({
 
   if (!SUBJECTS.includes(subject as typeof SUBJECTS[number])) notFound()
 
-  const session = await auth()
+  const session = await auth().catch(() => null)
   const topics = TOPICS.filter((t) => t.subject === subject)
 
   let userRating: number | null = null

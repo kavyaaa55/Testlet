@@ -23,11 +23,23 @@ export const TOPICS: TopicNode[] = [
   { id: 'db-tx',         name: 'Transactions & ACID',    subject: 'dbms',    beta:  0.5, prerequisites: ['db-basics'] },
   { id: 'db-query',      name: 'Query Optimization',     subject: 'dbms',    beta:  2.0, prerequisites: ['db-index', 'db-normal'] },
 
-  // OOP (4 nodes)
-  { id: 'oop-basics',    name: 'Classes & Objects',      subject: 'oop',     beta: -2.5, prerequisites: [] },
-  { id: 'oop-pillars',   name: '4 Pillars (APIE)',       subject: 'oop',     beta: -1.0, prerequisites: ['oop-basics'] },
-  { id: 'oop-solid',     name: 'SOLID Principles',       subject: 'oop',     beta:  1.0, prerequisites: ['oop-pillars'] },
-  { id: 'oop-patterns',  name: 'Design Patterns',        subject: 'oop',     beta:  2.0, prerequisites: ['oop-solid'] },
+  // OOP (10 nodes - includes legacy + new topics)
+  { id: 'oop-basics',      name: 'Classes & Objects',      subject: 'oop',     beta: -2.5, prerequisites: [] },
+  { id: 'oop-pillars',     name: '4 Pillars (APIE)',       subject: 'oop',     beta: -1.0, prerequisites: ['oop-basics'] },
+  { id: 'oop-interfaces',  name: 'Interfaces & Abstract',  subject: 'oop',     beta:  0.0, prerequisites: ['oop-pillars'] },
+  { id: 'oop-solid',       name: 'SOLID Principles',       subject: 'oop',     beta:  1.0, prerequisites: ['oop-pillars'] },
+  { id: 'oop-patterns',    name: 'Design Patterns',        subject: 'oop',     beta:  2.0, prerequisites: ['oop-solid'] },
+  // New OOP topics aligned with question tags
+  { id: 'oop-fundamentals', name: 'Classes & Objects',     subject: 'oop',     beta: -2.5, prerequisites: [] },
+  { id: 'oop-access',      name: 'Access Control',         subject: 'oop',     beta: -2.0, prerequisites: ['oop-fundamentals'] },
+  { id: 'oop-lifecycle',   name: 'Object Lifecycle',       subject: 'oop',     beta: -1.5, prerequisites: ['oop-fundamentals'] },
+  { id: 'oop-copy',        name: 'Copy Semantics',          subject: 'oop',     beta: -0.5, prerequisites: ['oop-lifecycle'] },
+  { id: 'oop-static',      name: 'Static Members',         subject: 'oop',     beta: -1.0, prerequisites: ['oop-fundamentals'] },
+  { id: 'oop-inheritance', name: 'Inheritance',            subject: 'oop',     beta:  0.0, prerequisites: ['oop-access'] },
+  { id: 'oop-advanced-inheritance', name: 'Advanced Inheritance', subject: 'oop', beta: 1.0, prerequisites: ['oop-inheritance'] },
+  { id: 'oop-polymorphism', name: 'Polymorphism',          subject: 'oop',     beta:  0.5, prerequisites: ['oop-inheritance'] },
+  { id: 'oop-abstraction', name: 'Abstraction',            subject: 'oop',     beta:  1.0, prerequisites: ['oop-polymorphism'] },
+  { id: 'oop-internals',   name: 'C++ Internals',          subject: 'oop',     beta:  2.5, prerequisites: ['oop-abstraction'] },
 
   // CN (4 nodes)
   { id: 'cn-basics',     name: 'OSI / TCP-IP Model',     subject: 'cn',      beta: -2.0, prerequisites: [] },
@@ -54,7 +66,8 @@ export function getUnlocked(
   const subjectTopics = TOPICS.filter(t => t.subject === subject)
   const unlocked: string[] = []
   const visited = new Set<string>()
-
+  
+  // Only start with root nodes
   const roots = subjectTopics.filter(t => t.prerequisites.length === 0)
   const queue = roots.map(t => t.id)
 
@@ -62,14 +75,27 @@ export function getUnlocked(
     const id = queue.shift()!
     if (visited.has(id)) continue
     visited.add(id)
-    unlocked.push(id)
-
-    if ((userTopicScores[id] ?? 0) >= 50) {
-      const children = subjectTopics.filter(t => t.prerequisites.includes(id))
-      queue.push(...children.map(t => t.id).filter(id => !visited.has(id)))
+    
+    // Check ALL prerequisites are >= 50 before adding to unlocked
+    const topic = subjectTopics.find(t => t.id === id)!
+    const allPrereqsMet = topic.prerequisites.every(
+      prereqId => (userTopicScores[prereqId] ?? 0) >= 50
+    )
+    
+    // Root nodes always unlock, others need prereqs
+    if (topic.prerequisites.length === 0 || allPrereqsMet) {
+      unlocked.push(id)
+      
+      // Only push children if THIS topic score >= 50
+      if ((userTopicScores[id] ?? 0) >= 50) {
+        const children = subjectTopics.filter(t => 
+          t.prerequisites.includes(id)
+        )
+        queue.push(...children.map(t => t.id).filter(c => !visited.has(c)))
+      }
     }
   }
-
+  
   return unlocked
 }
 

@@ -8,7 +8,8 @@ import SubjectCard from '@/components/SubjectCard'
 import SignInPrompt from '@/components/SignInPrompt'
 
 export default async function DashboardPage() {
-  const session = await auth()
+  // Wrap auth() so a transient DB error doesn't crash the page
+  const session = await auth().catch(() => null)
 
   const subjects = await Promise.all(
     SUBJECTS.map(async (subject) => {

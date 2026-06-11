@@ -27,6 +27,7 @@ export async function POST(req: Request) {
 
     return Response.json({
       isCorrect: result.isCorrect,
+      correctOption: result.correctOption,
       explanation: result.explanation,
       newRating: result.newRating,
       ratingDelta: result.ratingDelta,
